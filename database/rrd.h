@@ -13,6 +13,7 @@ typedef struct rrddimvar RRDDIMVAR;
 typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
+typedef struct context_param CONTEXT_PARAM;
 
 // forward declarations
 struct rrddim_volatile;
@@ -817,6 +818,9 @@ struct rrdhost {
     struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
 #endif
 
+    netdata_mutex_t claimed_id_lock;
+    char *claimed_id;                               // Claimed ID if host has one otherwise NULL
+
     struct rrdhost *next;
 };
 extern RRDHOST *localhost;
@@ -1048,6 +1052,19 @@ static inline time_t rrdset_first_entry_t(RRDSET *st) {
     } else {
         return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
     }
+}
+
+// get the timestamp of the last entry in the round robin database
+static inline time_t rrddim_last_entry_t(RRDDIM *rd) {
+    if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        return rd->state->query_ops.latest_time(rd);
+    return (time_t)rd->rrdset->last_updated.tv_sec;
+}
+
+static inline time_t rrddim_first_entry_t(RRDDIM *rd) {
+    if (rd->rrdset->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        return rd->state->query_ops.oldest_time(rd);
+    return (time_t)(rd->rrdset->last_updated.tv_sec - rrdset_duration(rd->rrdset));
 }
 
 time_t rrdhost_last_entry_t(RRDHOST *h);
